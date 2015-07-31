@@ -958,54 +958,59 @@ var (
 	libgdi32 uintptr
 
 	// Functions
-	abortDoc             uintptr
-	bitBlt               uintptr
-	choosePixelFormat    uintptr
-	closeEnhMetaFile     uintptr
-	copyEnhMetaFile      uintptr
-	createBitmap         uintptr
-	createBrushIndirect  uintptr
-	createCompatibleDC   uintptr
-	createDC             uintptr
-	createDIBSection     uintptr
-	createFontIndirect   uintptr
-	createEnhMetaFile    uintptr
-	createIC             uintptr
-	deleteDC             uintptr
-	deleteEnhMetaFile    uintptr
-	deleteObject         uintptr
-	ellipse              uintptr
-	endDoc               uintptr
-	endPage              uintptr
-	extCreatePen         uintptr
-	getDeviceCaps        uintptr
-	getEnhMetaFile       uintptr
-	getEnhMetaFileHeader uintptr
-	getObject            uintptr
-	getPixel             uintptr
-	getStockObject       uintptr
-	getTextExtentExPoint uintptr
-	getTextExtentPoint32 uintptr
-	getTextMetrics       uintptr
-	lineTo               uintptr
-	moveToEx             uintptr
-	playEnhMetaFile      uintptr
-	rectangle            uintptr
-	resetDC              uintptr
-	restoreDC            uintptr
-	selectObject         uintptr
-	setBkMode            uintptr
-	setBrushOrgEx        uintptr
-	setPixel             uintptr
-	setPixelFormat       uintptr
-	setStretchBltMode    uintptr
-	setTextColor         uintptr
-	saveDC               uintptr
-	startDoc             uintptr
-	startPage            uintptr
-	stretchBlt           uintptr
-	swapBuffers          uintptr
-	textOut              uintptr
+	abortDoc               uintptr
+	bitBlt                 uintptr
+	choosePixelFormat      uintptr
+	closeEnhMetaFile       uintptr
+	copyEnhMetaFile        uintptr
+	createBitmap           uintptr
+	createBrushIndirect    uintptr
+	createCompatibleDC     uintptr
+	createDC               uintptr
+	createDIBSection       uintptr
+	createFontIndirect     uintptr
+	createEnhMetaFile      uintptr
+	createIC               uintptr
+	deleteDC               uintptr
+	deleteEnhMetaFile      uintptr
+	deleteObject           uintptr
+	ellipse                uintptr
+	endDoc                 uintptr
+	endPage                uintptr
+	extCreatePen           uintptr
+	getDeviceCaps          uintptr
+	getEnhMetaFile         uintptr
+	getEnhMetaFileHeader   uintptr
+	getObject              uintptr
+	getPixel               uintptr
+	getStockObject         uintptr
+	getTextExtentExPoint   uintptr
+	getTextExtentPoint32   uintptr
+	getTextMetrics         uintptr
+	lineTo                 uintptr
+	moveToEx               uintptr
+	playEnhMetaFile        uintptr
+	rectangle              uintptr
+	polygon                uintptr
+	resetDC                uintptr
+	restoreDC              uintptr
+	selectObject           uintptr
+	setBkMode              uintptr
+	setBrushOrgEx          uintptr
+	setPixel               uintptr
+	setPixelFormat         uintptr
+	setStretchBltMode      uintptr
+	setTextColor           uintptr
+	saveDC                 uintptr
+	startDoc               uintptr
+	startPage              uintptr
+	stretchBlt             uintptr
+	swapBuffers            uintptr
+	textOut                uintptr
+	createCompatibleBitmap uintptr
+	setBkColor             uintptr
+	createRoundRectRgn     uintptr
+	roundRect              uintptr
 )
 
 func init() {
@@ -1046,6 +1051,7 @@ func init() {
 	moveToEx = MustGetProcAddress(libgdi32, "MoveToEx")
 	playEnhMetaFile = MustGetProcAddress(libgdi32, "PlayEnhMetaFile")
 	rectangle = MustGetProcAddress(libgdi32, "Rectangle")
+	polygon = MustGetProcAddress(libgdi32, "Polygon")
 	resetDC = MustGetProcAddress(libgdi32, "ResetDCW")
 	restoreDC = MustGetProcAddress(libgdi32, "RestoreDC")
 	saveDC = MustGetProcAddress(libgdi32, "SaveDC")
@@ -1061,7 +1067,10 @@ func init() {
 	stretchBlt = MustGetProcAddress(libgdi32, "StretchBlt")
 	swapBuffers = MustGetProcAddress(libgdi32, "SwapBuffers")
 	textOut = MustGetProcAddress(libgdi32, "TextOutW")
-
+	createCompatibleBitmap = MustGetProcAddress(libgdi32, "CreateCompatibleBitmap")
+	setBkColor = MustGetProcAddress(libgdi32, "SetBkColor")
+	createRoundRectRgn = MustGetProcAddress(libgdi32, "CreateRoundRectRgn")
+	roundRect = MustGetProcAddress(libgdi32, "RoundRect")
 }
 
 func AbortDoc(hdc HDC) int32 {
@@ -1317,7 +1326,7 @@ func GetPixel(hdc HDC, nXPos, nYPos int32) COLORREF {
 }
 
 func GetStockObject(fnObject int32) HGDIOBJ {
-	ret, _, _ := syscall.Syscall(getStockObject, 1,
+	ret, _, _ := syscall.Syscall(getDeviceCaps, 1,
 		uintptr(fnObject),
 		0,
 		0)
@@ -1387,6 +1396,15 @@ func PlayEnhMetaFile(hdc HDC, hemf HENHMETAFILE, lpRect *RECT) bool {
 		uintptr(hdc),
 		uintptr(hemf),
 		uintptr(unsafe.Pointer(lpRect)))
+
+	return ret != 0
+}
+
+func Polygon(hdc HDC, lpPoints []POINT) bool {
+	ret, _, _ := syscall.Syscall(polygon, 3,
+		uintptr(hdc),
+		uintptr(unsafe.Pointer(&lpPoints[0])),
+		uintptr(len(lpPoints)))
 
 	return ret != 0
 }
@@ -1549,6 +1567,43 @@ func TextOut(hdc HDC, nXStart, nYStart int32, lpString *uint16, cchString int32)
 		uintptr(nYStart),
 		uintptr(unsafe.Pointer(lpString)),
 		uintptr(cchString),
+		0)
+	return ret != 0
+}
+func CreateCompatibleBitmap(hdc HDC, w, h int) HBITMAP {
+	ret, _, _ := syscall.Syscall(createCompatibleBitmap, 3,
+		uintptr(hdc),
+		uintptr(w),
+		uintptr(h))
+	return HBITMAP(ret)
+}
+func SetBkColor(hdc HDC, color COLORREF) int32 {
+	ret, _, _ := syscall.Syscall(setBkColor, 2,
+		uintptr(hdc),
+		uintptr(color),
+		0)
+	return int32(ret)
+}
+func CreateRoundRectRgn(left, top, right, bottom int, w, h int) HREGION {
+	ret, _, _ := syscall.Syscall6(createRoundRectRgn, 6,
+		uintptr(left),
+		uintptr(top),
+		uintptr(right),
+		uintptr(bottom),
+		uintptr(w),
+		uintptr(h))
+	return HREGION(ret)
+}
+func RoundRect(hdc HDC, left, top, right, bottom int, w, h int) bool {
+	ret, _, _ := syscall.Syscall9(roundRect, 7,
+		uintptr(hdc),
+		uintptr(left),
+		uintptr(top),
+		uintptr(right),
+		uintptr(bottom),
+		uintptr(w),
+		uintptr(h),
+		0,
 		0)
 	return ret != 0
 }

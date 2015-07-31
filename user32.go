@@ -1170,59 +1170,31 @@ const (
 	CF_WAVE            = 12
 )
 
-// ScrollBar constants
-const (
-	SB_HORZ = 0
-	SB_VERT = 1
-	SB_CTL  = 2
-	SB_BOTH = 3
-)
-
-// ScrollBar commands
-const (
-	SB_LINEUP        = 0
-	SB_LINELEFT      = 0
-	SB_LINEDOWN      = 1
-	SB_LINERIGHT     = 1
-	SB_PAGEUP        = 2
-	SB_PAGELEFT      = 2
-	SB_PAGEDOWN      = 3
-	SB_PAGERIGHT     = 3
-	SB_THUMBPOSITION = 4
-	SB_THUMBTRACK    = 5
-	SB_TOP           = 6
-	SB_LEFT          = 6
-	SB_BOTTOM        = 7
-	SB_RIGHT         = 7
-	SB_ENDSCROLL     = 8
-)
-
-// [Get|Set]ScrollInfo mask constants
-const (
-	SIF_RANGE           = 1
-	SIF_PAGE            = 2
-	SIF_POS             = 4
-	SIF_DISABLENOSCROLL = 8
-	SIF_TRACKPOS        = 16
-	SIF_ALL             = SIF_RANGE + SIF_PAGE + SIF_POS + SIF_TRACKPOS
-)
-
-// DrawIconEx flags
-const (
-	DI_COMPAT      = 0x0004
-	DI_DEFAULTSIZE = 0x0008
-	DI_IMAGE       = 0x0002
-	DI_MASK        = 0x0001
-	DI_NOMIRROR    = 0x0010
-	DI_NORMAL      = DI_IMAGE | DI_MASK
-)
-
 type MONITORINFO struct {
 	CbSize    uint32
 	RcMonitor RECT
 	RcWork    RECT
 	DwFlags   uint32
 }
+
+const (
+	TME_CANCEL    = 0x80000000
+	TME_HOVER     = 0x00000001
+	TME_LEAVE     = 0x00000002
+	TME_NONCLIENT = 0x00000010
+	TME_QUERY     = 0x40000000
+)
+
+const (
+	WVR_ALIGNTOP    = 0x0010
+	WVR_ALIGNRIGHT  = 0x0080
+	WVR_ALIGNLEFT   = 0x0020
+	WVR_ALIGNBOTTOM = 0x0040
+	WVR_HREDRAW     = 0x0100
+	WVR_VREDRAW     = 0x0200
+	WVR_REDRAW      = 0x0300
+	WVR_VALIDRECTS  = 0x0400
+)
 
 type (
 	HACCEL    HANDLE
@@ -1460,14 +1432,22 @@ type HARDWAREINPUT struct {
 	Unused  [16]byte
 }
 
-type SCROLLINFO struct {
-	CbSize    uint32
-	FMask     uint32
-	NMin      int32
-	NMax      int32
-	NPage     uint32
-	NPos      int32
-	NTrackPos int32
+type TRACKMOUSEEVENT struct {
+	Size      uint32
+	Flags     uint32
+	Track     HWND
+	HoverTime uint32
+}
+
+type NCCALCSIZE_PARAMS struct {
+	Rgrc  [3]RECT
+	Lppos *WINDOWPOS
+}
+
+type WINDOWPOS struct {
+	Hwnd, HwndInsertAfter HWND
+	X, Y, Cx, Cy          int32
+	Flags                 uint32
 }
 
 func GET_X_LPARAM(lp uintptr) int32 {
@@ -1501,7 +1481,6 @@ var (
 	destroyWindow              uintptr
 	dialogBoxParam             uintptr
 	dispatchMessage            uintptr
-	drawIconEx                 uintptr
 	drawMenuBar                uintptr
 	drawFocusRect              uintptr
 	drawTextEx                 uintptr
@@ -1518,6 +1497,9 @@ var (
 	getClipboardData           uintptr
 	getCursorPos               uintptr
 	getDC                      uintptr
+	getWindowDC                uintptr
+	drawFrameControl           uintptr
+	getDCEx                    uintptr
 	getFocus                   uintptr
 	getKeyState                uintptr
 	getMenuInfo                uintptr
@@ -1525,7 +1507,6 @@ var (
 	getMonitorInfo             uintptr
 	getParent                  uintptr
 	getRawInputData            uintptr
-	getScrollInfo              uintptr
 	getSysColor                uintptr
 	getSysColorBrush           uintptr
 	getSystemMetrics           uintptr
@@ -1557,6 +1538,7 @@ var (
 	postMessage                uintptr
 	postQuitMessage            uintptr
 	registerClassEx            uintptr
+	getClassInfoEx             uintptr
 	registerRawInputDevices    uintptr
 	registerWindowMessage      uintptr
 	releaseCapture             uintptr
@@ -1578,7 +1560,6 @@ var (
 	setMenuItemInfo            uintptr
 	setParent                  uintptr
 	setRect                    uintptr
-	setScrollInfo              uintptr
 	setTimer                   uintptr
 	setWindowLong              uintptr
 	setWindowLongPtr           uintptr
@@ -1590,6 +1571,14 @@ var (
 	translateMessage           uintptr
 	updateWindow               uintptr
 	windowFromPoint            uintptr
+	setWindowRgn               uintptr
+	trackMouseEvent            uintptr
+	setProcessDPIAware         uintptr
+	drawIcon                   uintptr
+	isZoomed                   uintptr
+	setWindowsHookEx           uintptr
+	callNextHookEx             uintptr
+	unhookWindowsHookEx        uintptr
 )
 
 func init() {
@@ -1617,7 +1606,6 @@ func init() {
 	destroyWindow = MustGetProcAddress(libuser32, "DestroyWindow")
 	dialogBoxParam = MustGetProcAddress(libuser32, "DialogBoxParamW")
 	dispatchMessage = MustGetProcAddress(libuser32, "DispatchMessageW")
-	drawIconEx = MustGetProcAddress(libuser32, "DrawIconEx")
 	drawFocusRect = MustGetProcAddress(libuser32, "DrawFocusRect")
 	drawMenuBar = MustGetProcAddress(libuser32, "DrawMenuBar")
 	drawTextEx = MustGetProcAddress(libuser32, "DrawTextExW")
@@ -1634,6 +1622,9 @@ func init() {
 	getClipboardData = MustGetProcAddress(libuser32, "GetClipboardData")
 	getCursorPos = MustGetProcAddress(libuser32, "GetCursorPos")
 	getDC = MustGetProcAddress(libuser32, "GetDC")
+	drawFrameControl = MustGetProcAddress(libuser32, "DrawFrameControl")
+	getWindowDC = MustGetProcAddress(libuser32, "GetWindowDC")
+	getDCEx = MustGetProcAddress(libuser32, "GetDCEx")
 	getFocus = MustGetProcAddress(libuser32, "GetFocus")
 	getKeyState = MustGetProcAddress(libuser32, "GetKeyState")
 	getMenuInfo = MustGetProcAddress(libuser32, "GetMenuInfo")
@@ -1641,7 +1632,6 @@ func init() {
 	getMonitorInfo = MustGetProcAddress(libuser32, "GetMonitorInfoW")
 	getParent = MustGetProcAddress(libuser32, "GetParent")
 	getRawInputData = MustGetProcAddress(libuser32, "GetRawInputData")
-	getScrollInfo = MustGetProcAddress(libuser32, "GetScrollInfo")
 	getSysColor = MustGetProcAddress(libuser32, "GetSysColor")
 	getSysColorBrush = MustGetProcAddress(libuser32, "GetSysColorBrush")
 	getSystemMetrics = MustGetProcAddress(libuser32, "GetSystemMetrics")
@@ -1678,6 +1668,7 @@ func init() {
 	postMessage = MustGetProcAddress(libuser32, "PostMessageW")
 	postQuitMessage = MustGetProcAddress(libuser32, "PostQuitMessage")
 	registerClassEx = MustGetProcAddress(libuser32, "RegisterClassExW")
+	getClassInfoEx = MustGetProcAddress(libuser32, "GetClassInfoExW")
 	registerRawInputDevices = MustGetProcAddress(libuser32, "RegisterRawInputDevices")
 	registerWindowMessage = MustGetProcAddress(libuser32, "RegisterWindowMessageW")
 	releaseCapture = MustGetProcAddress(libuser32, "ReleaseCapture")
@@ -1699,7 +1690,6 @@ func init() {
 	setMenuItemInfo = MustGetProcAddress(libuser32, "SetMenuItemInfoW")
 	setRect = MustGetProcAddress(libuser32, "SetRect")
 	setParent = MustGetProcAddress(libuser32, "SetParent")
-	setScrollInfo = MustGetProcAddress(libuser32, "SetScrollInfo")
 	setTimer = MustGetProcAddress(libuser32, "SetTimer")
 	setWindowLong = MustGetProcAddress(libuser32, "SetWindowLongW")
 	// On 32 bit SetWindowLongPtrW is not available
@@ -1716,6 +1706,23 @@ func init() {
 	translateMessage = MustGetProcAddress(libuser32, "TranslateMessage")
 	updateWindow = MustGetProcAddress(libuser32, "UpdateWindow")
 	windowFromPoint = MustGetProcAddress(libuser32, "WindowFromPoint")
+	setWindowRgn = MustGetProcAddress(libuser32, "SetWindowRgn")
+	trackMouseEvent = MustGetProcAddress(libuser32, "TrackMouseEvent")
+	setProcessDPIAware = MustGetProcAddress(libuser32, "SetProcessDPIAware")
+	drawIcon = MustGetProcAddress(libuser32, "DrawIcon")
+	isZoomed = MustGetProcAddress(libuser32, "IsZoomed")
+	setWindowsHookEx = MustGetProcAddress(libuser32, "SetWindowsHookExW")
+	callNextHookEx = MustGetProcAddress(libuser32, "CallNextHookEx")
+	unhookWindowsHookEx = MustGetProcAddress(libuser32, "UnhookWindowsHookEx")
+}
+
+func SetProcessDPIAware() bool {
+	ret, _, _ := syscall.Syscall(setProcessDPIAware, 0,
+		0,
+		0,
+		0)
+
+	return ret != 0
 }
 
 func AdjustWindowRect(lpRect *RECT, dwStyle uint32, bMenu bool) bool {
@@ -1917,21 +1924,6 @@ func DrawFocusRect(hDC HDC, lprc *RECT) bool {
 	return ret != 0
 }
 
-func DrawIconEx(hdc HDC, xLeft, yTop int32, hIcon HICON, cxWidth, cyWidth int32, istepIfAniCur uint32, hbrFlickerFreeDraw HBRUSH, diFlags uint32) bool {
-	ret, _, _ := syscall.Syscall9(drawIconEx, 9,
-		uintptr(hdc),
-		uintptr(xLeft),
-		uintptr(yTop),
-		uintptr(hIcon),
-		uintptr(cxWidth),
-		uintptr(cyWidth),
-		uintptr(istepIfAniCur),
-		uintptr(hbrFlickerFreeDraw),
-		uintptr(diFlags))
-
-	return ret != 0
-}
-
 func DrawMenuBar(hWnd HWND) bool {
 	ret, _, _ := syscall.Syscall(drawMenuBar, 1,
 		uintptr(hWnd),
@@ -2070,6 +2062,36 @@ func GetDC(hWnd HWND) HDC {
 	return HDC(ret)
 }
 
+func DrawFrameControl(hdc HDC, lprc *RECT, uType, uState uint32) bool {
+	ret, _, _ := syscall.Syscall6(drawFrameControl, 4,
+		uintptr(hdc),
+		uintptr(unsafe.Pointer(lprc)),
+		uintptr(uType),
+		uintptr(uState),
+		0,
+		0)
+
+	return ret != 0
+}
+
+func GetWindowDC(hWnd HWND) HDC {
+	ret, _, _ := syscall.Syscall(getWindowDC, 1,
+		uintptr(hWnd),
+		0,
+		0)
+
+	return HDC(ret)
+}
+
+func GetDCEx(hWnd HWND, rgn HREGION, flag uint32) HDC {
+	ret, _, _ := syscall.Syscall(getDCEx, 3,
+		uintptr(hWnd),
+		uintptr(rgn),
+		uintptr(flag))
+
+	return HDC(ret)
+}
+
 func GetFocus() HWND {
 	ret, _, _ := syscall.Syscall(getFocus, 0,
 		0,
@@ -2137,15 +2159,6 @@ func GetRawInputData(hRawInput HRAWINPUT, uiCommand uint32, pData unsafe.Pointer
 		0)
 
 	return uint32(ret)
-}
-
-func GetScrollInfo(hwnd HWND, fnBar int32, lpsi *SCROLLINFO) bool {
-	ret, _, _ := syscall.Syscall(getScrollInfo, 3,
-		uintptr(hwnd),
-		uintptr(fnBar),
-		uintptr(unsafe.Pointer(lpsi)))
-
-	return ret != 0
 }
 
 func GetSysColor(nIndex int) uint32 {
@@ -2451,6 +2464,15 @@ func PostQuitMessage(exitCode int32) {
 		0)
 }
 
+func GetClassInfoEx(hins HINSTANCE, name *uint16, windowClass *WNDCLASSEX) bool {
+	ret, _, _ := syscall.Syscall(getClassInfoEx, 3,
+		uintptr(hins),
+		uintptr(unsafe.Pointer(name)),
+		uintptr(unsafe.Pointer(windowClass)))
+
+	return ret == 1
+}
+
 func RegisterClassEx(windowClass *WNDCLASSEX) ATOM {
 	ret, _, _ := syscall.Syscall(registerClassEx, 1,
 		uintptr(unsafe.Pointer(windowClass)),
@@ -2526,7 +2548,6 @@ func SendDlgItemMessage(hWnd HWND, id int32, msg uint32, wParam, lParam uintptr)
 	return ret
 }
 
-// pInputs expects a unsafe.Pointer to a slice of MOUSE_INPUT or KEYBD_INPUT or HARDWARE_INPUT structs.
 func SendInput(nInputs uint32, pInputs unsafe.Pointer, cbSize int32) uint32 {
 	ret, _, _ := syscall.Syscall(sendInput, 3,
 		uintptr(nInputs),
@@ -2662,18 +2683,6 @@ func SetRect(lprc *RECT, xLeft, yTop, xRight, yBottom uint32) BOOL {
 	return BOOL(ret)
 }
 
-func SetScrollInfo(hwnd HWND, fnBar int32, lpsi *SCROLLINFO, fRedraw bool) int32 {
-	ret, _, _ := syscall.Syscall6(setScrollInfo, 4,
-		uintptr(hwnd),
-		uintptr(fnBar),
-		uintptr(unsafe.Pointer(lpsi)),
-		uintptr(BoolToBOOL(fRedraw)),
-		0,
-		0)
-
-	return int32(ret)
-}
-
 func SetTimer(hWnd HWND, nIDEvent uintptr, uElapse uint32, lpTimerFunc uintptr) uintptr {
 	ret, _, _ := syscall.Syscall6(setTimer, 4,
 		uintptr(hWnd),
@@ -2785,4 +2794,69 @@ func WindowFromPoint(Point POINT) HWND {
 		0)
 
 	return HWND(ret)
+}
+
+func SetWindowRgn(w HWND, rgn HREGION, redraw bool) int {
+	ret, _, _ := syscall.Syscall(setWindowRgn, 3,
+		uintptr(w),
+		uintptr(rgn),
+		uintptr(BoolToBOOL(redraw)))
+	return int(ret)
+}
+
+func TrackMouseEvent(eventTrack *TRACKMOUSEEVENT) bool {
+	ret, _, _ := syscall.Syscall(trackMouseEvent, 1,
+		uintptr(unsafe.Pointer(eventTrack)),
+		0,
+		0)
+	return ret != 0
+}
+
+func DrawIcon(hdc HDC, x, y int32, hicon HICON) bool {
+	ret, _, _ := syscall.Syscall6(drawIcon, 4,
+		uintptr(hdc),
+		uintptr(x),
+		uintptr(y),
+		uintptr(hicon),
+		0,
+		0)
+	return ret != 0
+}
+
+func IsZoomed(hWnd HWND) bool {
+	ret, _, _ := syscall.Syscall(isZoomed, 1,
+		uintptr(hWnd),
+		0,
+		0)
+	return ret != 0
+}
+
+func SetWindowsHookEx(idHook int32, lpfn uintptr, hMod HINSTANCE, dwThreadId uint32) uintptr {
+	ret, _, _ := syscall.Syscall6(setWindowsHookEx, 4,
+		uintptr(idHook),
+		uintptr(lpfn),
+		uintptr(hMod),
+		uintptr(dwThreadId),
+		0,
+		0)
+	return uintptr(ret)
+}
+
+func CallNextHookEx(hhk uintptr, nCode int32, wParam, lParam uintptr) uintptr {
+	ret, _, _ := syscall.Syscall6(callNextHookEx, 4,
+		uintptr(0),
+		uintptr(nCode),
+		wParam,
+		lParam,
+		0,
+		0)
+	return uintptr(ret)
+}
+
+func UnhookWindowsHookEx(hhk uintptr) bool {
+	ret, _, _ := syscall.Syscall(unhookWindowsHookEx, 1,
+		hhk,
+		0,
+		0)
+	return ret != 0
 }
